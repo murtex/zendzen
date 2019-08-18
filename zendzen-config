@@ -1,0 +1,65 @@
+#!/bin/bash
+
+	# -----------------------------------------------------------------------
+	# config
+INTERVAL_CPU=1
+INTERVAL_IDLE=3
+
+NPROCS=5 # number of processes to watch (cpu and mem)
+NCORES=4 # number of cores to watch
+HWMON=(coretemp thinkpad acpitz pch_wildcat_point iwlwifi) # sensors to watch (empty for all)
+NETDEVS=(enp0s25 wlp3s0) # network devices to monitor (empty for all)
+BATS=(BAT0 BAT1) # batteries to monitor (empty for all)
+
+FONT_NAME="mono"
+FONT_SIZE=7
+SPACING=2 # line spacing
+PADDING=14 # horizontal window padding
+BORDER=6 # screen border
+LINES=60 # number of lines (start high and gradually reduce)
+WIDTH=450
+HEIGHT="$(u_calcf "$(u_height "|")+2*$SPACING")"
+POSX="$(u_calcf "$(xrandr -q | awk -v w=$WIDTH 'NR==1 {printf $8-w}')-$BORDER")"
+POSY="$(u_calcf "-$HEIGHT-$BORDER")"
+
+PKG_CRITICAL1=20 # packages
+PKG_CRITICAL2=50
+CPU_CRITICAL1=40 # percentage
+CPU_CRITICAL2=70
+TEMP_CRITICAL1=55 # celsius
+TEMP_CRITICAL2=65
+BAT_CRITICAL1=50 # percentage
+BAT_CRITICAL2=25
+
+COL_BLACK="#1d1c0c"
+COL_BLACK_LIGHT="#545343"
+COL_BLACK_ALT1="#605f4e"
+COL_BLACK_ALT2="#93917f"
+COL_RED="#c98e90"
+COL_RED_LIGHT="#e6a8aa"
+COL_GREEN="#88a586"
+COL_GREEN_LIGHT="#a2c1a0"
+COL_YELLOW="#c9b694"
+COL_YELLOW_LIGHT="#e6d1af"
+COL_BLUE="#8ac3c4"
+COL_BLUE_LIGHT="#a6dfe0"
+COL_MAGENTA="#b195b5"
+COL_MAGENTA_LIGHT="#cfafd1"
+COL_CYAN="#87a1c1"
+COL_CYAN_LIGHT="#a2bcdd"
+COL_WHITE="#d7d5c2"
+COL_WHITE_LIGHT="#f3f1dd"
+
+COL_FG=$COL_WHITE_LIGHT
+COL_BG=$COL_BLACK_LIGHT
+
+COL_FG_HI=$COL_FG
+COL_BG_HI=$COL_BG
+COL_FG_BAR=$COL_BLACK_ALT2
+COL_BG_BAR=$COL_BLACK_ALT1
+
+COL_FG_CRITICAL1=$COL_BG
+COL_FG_CRITICAL2=$COL_BG
+COL_BG_CRITICAL1=$COL_YELLOW
+COL_BG_CRITICAL2=$COL_RED
+

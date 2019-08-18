@@ -1,0 +1,159 @@
+#!/bin/bash
+
+DIR="${BASH_SOURCE%/*}"
+if [ ! -d "$DIR" ]; then DIR="$PWD"; fi
+
+source "$DIR/zendzen-util"
+source "$DIR/zendzen-config"
+source "$DIR/zendzen-display"
+source "$DIR/zendzen-monitor"
+source "$DIR/zendzen-format"
+
+	# -----------------------------------------------------------------------
+	# toggle current visibility
+if [ "$1" = "toggle" ]; then
+	idtitle="$(xdotool search --name "dzen title")"
+	idslave="$(xdotool search --name "dzen slave")"
+
+	if [ -z "$idtitle" ]; then exit 1; fi
+	if [ -z "$idslave" ]; then exit 1; fi
+
+	vistitle="$(xdotool search --onlyvisible --name "dzen title")"
+	visslave="$(xdotool search --onlyvisible --name "dzen slave")"
+
+		# title --> title+slave --> hidden
+	if [ -n "$vistitle" ]; then
+		if [ -n "$visslave" ]; then
+			xdotool windowunmap $idtitle
+			xdotool windowunmap $idslave
+		else
+			xdotool windowmap $idslave
+		fi
+	else
+		xdotool windowmap $idtitle
+	fi
+
+		# title --> hidden --> title+slave
+	# if [ -n "$vistitle" ]; then
+	# 	if [ -n "$visslave" ]; then
+	# 		xdotool windowunmap $idslave
+	# 	else
+	# 		xdotool windowunmap $idtitle
+	# 	fi
+	# else
+	# 	xdotool windowmap $idtitle
+	# 	xdotool windowmap $idslave
+	# fi
+
+	exit 0
+fi
+
+	# -----------------------------------------------------------------------
+	# start new instance
+while true; do
+
+		# query monitors
+	M_TIME="$(m_datetime time)"
+	M_DATE="$(m_datetime date)"
+
+	M_HOSTNAME="$(m_hostname)"
+	M_UPTIME="$(m_uptime)"
+	# M_PKG="$(m_pkg)"
+
+	M_CPU="$(m_cpu)"
+	M_MEM=($(m_mem))
+	M_PROC_CPU="$(m_proc cpu $NPROCS)"
+	M_PROC_MEM="$(m_proc mem $NPROCS)"
+
+	M_HWMON_FAN="$(m_hwmon fan)"
+	M_HWMON_TEMP="$(m_hwmon temp)"
+	M_HWMON_TEMP_BAR=($(u_listi "$M_HWMON_TEMP" 4)) # TODO: thinkpad!
+
+	M_NET="$(m_net)"
+
+	M_BAT="$(m_bat)"
+	M_BAT_BAR=($(u_listi "$M_BAT" 2))
+
+		# display
+	# $(d_duplet "updates:" "$(d_critical "$M_PKG" "$PKG_CRITICAL1" "$PKG_CRITICAL2" "$M_PKG")")
+
+read -r -d '' dsp <<- EOV
+	$(clear)
+	^tw()$(d_triplet "cpu: $(f_cpu "$(u_listi "$M_CPU" 1)")" "temp: $(f_temp "${M_HWMON_TEMP_BAR[0]}")" "bat: $(d_critical "${M_BAT_BAR[1]}" "$BAT_CRITICAL1" "$BAT_CRITICAL2" "${M_BAT_BAR[1]}% (${M_BAT_BAR[2]})")")
+
+	$(d_singlet "$M_TIME")
+	$(d_singlet "$M_DATE")
+
+	$(d_group "${M_HOSTNAME^^}")
+	$(d_duplet "uptime:" "$(f_dur "$M_UPTIME")")
+
+	$(d_group "CPU")
+	$(for i in $(seq 1 "$(wc -l <<< "$M_PROC_CPU")"); do
+		m=($(u_listi "$M_PROC_CPU" "$i"))
+		f=("$(f_cpu "${m[0]}")" $(f_cmd "${m[*]:2}" "${m[1]}"))
+		echo "$(d_duplet "${f[*]:1}" "${f[0]}")"
+	done)
+
+	$(for i in $(seq 2 "$(wc -l <<< "$M_CPU")"); do
+		m="$(u_listi "$M_CPU" "$i")"
+		echo "$(d_barhang "cpu"$(u_calcf "$i-1")":" "$m" 0 100)"
+	done)
+
+	$(d_group "SENSORS")
+	$(for i in $(seq 1 "$(wc -l <<< "$M_HWMON_FAN")"); do
+		m=($(u_listi "$M_HWMON_FAN" "$i"))
+		f=("$(f_fan "${m[0]}")" "${m[*]:1}")
+		echo "$(d_duplet "${f[*]:1}" "${f[0]}")"
+	done)
+	$(for i in $(seq 1 "$(wc -l <<< "$M_HWMON_TEMP")"); do
+		m=($(u_listi "$M_HWMON_TEMP" "$i"))
+		f=("$(f_temp "${m[0]}")" "${m[*]:1}")
+		echo "$(d_duplet "${f[*]:1}" "${f[0]}")"
+	done)
+
+	$(d_group "MEMORY")
+	$(for i in $(seq 1 "$(wc -l <<< "$M_PROC_MEM")"); do
+		m=($(u_listi "$M_PROC_MEM" "$i"))
+		f=("$(f_mem "${m[0]}")" $(f_cmd "${m[*]:2}" "${m[1]}"))
+		echo "$(d_duplet "${f[*]:1}" "${f[0]}")"
+	done)
+
+	$(d_duplet "swap:" "$(f_mem "${M_MEM[2]}")")
+	$(d_barfull "${M_MEM[3]}" 0 100)
+	$(d_duplet "ram:" "$(f_mem "${M_MEM[0]}")")
+	$(d_barfull "${M_MEM[1]}" 0 100)
+
+	$(d_group "NETWORK")
+	$(for i in $(seq 1 "$(wc -l <<< "$M_NET")"); do
+		m=($(u_listi "$M_NET" "$i"))
+		# if [ "${m[1]}" = "up" ]; then
+			echo "$(d_duplet "${m[0]}:" "${m[2]}")"
+			echo "$(d_duplet "down ($(f_mem "${m[3]}"))" "TODO")"
+			echo "$(d_duplet "up ($(f_mem "${m[4]}"))" "TODO")"
+			echo
+		# fi
+	done)
+
+	$(d_group "BATTERY")
+	$(for i in $(seq 1 "$(wc -l <<< "$M_BAT")"); do
+		m=($(u_listi "$M_BAT" "$i"))
+		echo "$(d_duplet "${m[0],,}:" "$(d_critical "${m[1]}" "$BAT_CRITICAL1" "$BAT_CRITICAL2" "${m[1]}% $(if [ -n "${m[3]}" ]; then echo "(${m[2]} $(f_dur "${m[3]}"))"; else echo "(${m[2]})"; fi)")")"
+		echo "$(d_barfull "${m[1]}" 0 100)"
+	done)
+EOV
+
+	l="$(wc -l <<< "$dsp")"
+	for i in $(seq 1 "$(u_calci "$LINES-$l+2")"); do
+		dsp="$dsp"$'\n'
+	done
+
+		# flush and idle
+	echo "$dsp"
+	sleep $INTERVAL_IDLE
+
+done | dzen2 -ta l -sa l -fn "$FONT_NAME:size=$FONT_SIZE" -x "$POSX" -y "$POSY" -w "$WIDTH" -h "$HEIGHT" -l "$LINES" -fg $COL_FG -bg $COL_BG -e "onstart=uncollapse,collapse,ungrabkeys,ungrabmouse"
+
+	# -----------------------------------------------------------------------
+	# done
+exit 0
+

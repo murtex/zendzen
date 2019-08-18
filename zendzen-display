@@ -1,0 +1,95 @@
+#/bin/bash
+
+	# -----------------------------------------------------------------------
+	# display
+d_bold() {
+	# bold text $1, do not nest
+	ret="^fn($FONT_NAME:size=$FONT_SIZE:style=bold)$1^fn()"
+	echo "$ret"
+}
+
+d_italic() {
+	# italic text ($1), do not nest
+	ret="^fn($FONT_NAME:size=$FONT_SIZE:style=italic)$1^fn()"
+	echo "$ret"
+}
+
+d_critical() {
+	# critical markup (val: $1, min: $2, max: $3, text: $4)
+	cmp="<"
+	if [ 1 -eq $(u_calcf "$2 > $3") ] ; then
+		cmp=">"
+	fi
+	if [ 1 -eq $(u_calcf "$1 $cmp $2") ] ; then
+		echo "$4"
+	elif [ 1 -eq $(u_calcf "$1 $cmp $3") ] ; then
+		echo "$(d_bold "^fg($COL_FG_CRITICAL1)^bg($COL_BG_CRITICAL1)$4^fg()^bg()")"
+	else
+		echo "$(d_bold "^fg($COL_FG_CRITICAL2)^bg($COL_BG_CRITICAL2)$4^fg()^bg()")"
+	fi
+}
+
+d_clean() {
+	# strip dzen formatting
+	ret="$(sed -e 's/\^\(fn\|fg\|bg\)([^)]*)//g' <<< "$1")"
+	echo "$ret"
+}
+
+d_group() {
+	# left aligned text ($1) with separator line
+	w1="$(u_width "$(d_clean "$1")")"
+	w2="$(u_calcf "$WIDTH-3*$PADDING-$w1")"
+	x1="$PADDING"
+	x2="$(u_calcf "$w1+2*$PADDING")"
+	ret="^fg($COL_FG_BAR)^pa($x1)$1^pa($x2)^r(${w2}x1)^fg()"
+	echo "$ret"
+}
+
+d_barhang() {
+	# text ($1) with hanging meter bar (val: $2, min: $3, max: $4)
+	w1="$(u_width "$(d_clean "$1")")"
+	x1="$PADDING"
+	w2="$(u_calcf "$WIDTH-$w1-3*$PADDING")"
+	x2="$(u_calcf "$w1+2*$PADDING")"
+	ret="^pa($x1)$1^pa($x2)$(echo "$2 $3 $4" | gdbar -w "$w2" -fg "$COL_FG_BAR" -bg "$COL_BG_BAR")"
+	echo "$ret"
+}
+
+d_barfull() {
+	# full-width meter bar (val: $1, min: $2, max: $3)
+	w="$(u_calcf "$WIDTH-2*$PADDING")"
+	x="$PADDING"
+	ret="^pa($x)$(echo "$1 $2 $3" | gdbar -w "$w" -fg "$COL_FG_BAR" -bg "$COL_BG_BAR")"
+	echo "$ret"
+}
+
+d_singlet() {
+	# centered text ($1)
+	w="$(u_width "$(d_clean "$1")")"
+	x="$(u_calcf "($WIDTH-$w)/2")"
+	ret="^pa($x)$1"
+	echo "$ret"
+}
+
+d_duplet() {
+	# left ($1) and right ($2) aligned text
+	w1="$(u_width "$(d_clean "$1")")"
+	w2="$(u_width "$(d_clean "$2")")"
+	x1="$PADDING"
+	x2="$(u_calcf "$WIDTH-$w2-$PADDING")"
+	ret="^pa($x1)$1^pa($x2)$2"
+	echo "$ret"
+}
+
+d_triplet() {
+	# left ($1), center ($2) and right ($3) aligned text
+	w1="$(u_width "$(d_clean "$1")")"
+	w2="$(u_width "$(d_clean "$2")")"
+	w3="$(u_width "$(d_clean "$3")")"
+	x1="$PADDING"
+	x2="$(u_calcf "($PADDING+$w1-$w2-$w3+$WIDTH)/2")"
+	x3="$(u_calcf "$WIDTH-$w3-$PADDING")"
+	ret="^pa($x1)$1^pa($x2)$2^pa($x3)$3"
+	echo "$ret"
+}
+

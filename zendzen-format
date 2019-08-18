@@ -1,0 +1,57 @@
+#!/bin/bash
+
+	# -----------------------------------------------------------------------
+	# formats
+f_dur() {
+	# duration ($1 in s) in days, hours, minutes
+	ret=()
+	d="$(u_calci "$1/(24*3600)")"
+	if [ "$d" -gt 0 ]; then
+		ret=("${ret[@]}" "$(printf "%dd" "$d")")
+	fi
+	h="$(u_calci "($1%(24*3600))/3600")"
+	if [ "$h" -gt 0 ]; then
+		ret=("${ret[@]}" "$(printf "%dh" "$h")")
+	fi
+	m="$(u_calci "(($1%(24*3600))%3600)/60")"
+	if [ "$m" -gt 0 ]; then
+		ret=("${ret[@]}" "$(printf "%dm" "$m")")
+	fi
+	# s="$(u_calci "(($1%(24*3600))%3600)%60")"
+	# if [ "$s" -gt 0 ]; then
+	# 	ret=("${ret[@]}" "$(printf "%ds" "$s")")
+	# fi
+	echo "${ret[@]}"
+}
+
+f_cpu() {
+	# cpu percentage ($1), single decimal
+	ret="$(d_critical "$1" "$CPU_CRITICAL1" "$CPU_CRITICAL2" "$(printf "%.1f%%" "$1")")"
+	echo "$ret"
+}
+
+f_cmd() {
+	# command name ($1) and number of processes ($2) in parentheses
+	ret="$1 $(if [ "$2" -gt 1 ]; then echo "($2)"; fi)"
+	echo "$ret"
+}
+
+f_mem() {
+	# memory ($1 in kiB) in MiB, single decimal
+	ret="$(printf "%.1fMiB" "$(u_calcf "$1/1024")")"
+	echo "$ret"
+}
+
+f_temp() {
+	# temperature in degree celsius, integer
+	v="$(u_calcf "$1/1000")"
+	ret="$(d_critical "$v" "$TEMP_CRITICAL1" "$TEMP_CRITICAL2" "$(printf "%.0f°C" "$v")")"
+	echo "$ret"
+}
+
+f_fan() {
+	# rotations perminute, integer
+	ret="$(printf "%.0frpm" "$1")"
+	echo "$ret"
+}
+

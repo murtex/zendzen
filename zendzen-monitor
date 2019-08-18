@@ -1,0 +1,129 @@
+#!/bin/bash
+
+	# -----------------------------------------------------------------------
+	# monitors
+m_datetime() {
+	case "$1" in
+		time) ret="$(date +'%I:%M %p')" ;;
+		date) ret="$(date +'%A, %B %d (W%V)')" ;;
+		time_bar) ret="$(date +'%I:%M')" ;;
+		date_bar) ret="$(date +'%b %d')" ;;
+	esac
+	echo "$ret"
+}
+
+m_hostname () {
+	ret="$(hostname)"
+	echo "$ret"
+}
+m_uptime() {
+	# uptime in seconds
+	ret="$(awk '{print int( $1 )}' /proc/uptime)"
+	echo "$ret"
+}
+m_pkg() {
+	ret="$(checkpkg | wc -l)"
+	echo "$ret"
+}
+
+m_cpu() {
+	# cpu load percentages (total and individual)
+	ret="$(mpstat -P ALL "$INTERVAL_CPU" 1 | awk '/Average:/ && ($2~/all/ || $2~/[0-9]/) {print 100-$12}')"
+	ret="$(awk -v n="$NCORES" 'NR<=(n+1)' <<< "$ret")"
+	echo "$ret"
+}
+m_cpun() {
+	# number of cores
+	ret="$(awk '/^processor/{print $3}' /proc/cpuinfo | wc -l)"
+	echo "$ret"
+}
+
+m_proc() {
+	# top n-th ($2) processes (cpu/mem, count, command)
+	case "$1" in
+		cpu) ret="$(top -b -n 1 -E k -w 512 | awk -v n="$(m_cpun)" 'NR>7 {i=$12; for (k=13; k<=NF; k++) i=i" "$k; a[i]+=$9; c[i]++} END {for (i in a) print a[i]/n, c[i], i}')" ;;
+		mem) ret="$(ps -eo rss=,comm= | awk '{i=$2; for (k=4; k<=NF; k++) i=i" "$k; a[i]+=$1; c[i]++} END {for (i in a) print a[i], c[i], i}')" ;;
+	esac
+	ret="$(sort -g -r <<< "$ret" | awk -v n="$2" 'NR<=n')"
+	echo "$ret"
+}
+
+m_hwmon() {
+	# sensor table (millidegree/rpm, module)
+	f="$(readlink -f /sys/class/hwmon/*/$1*_input | sort)"
+	ret="$(for i in $f; do
+		v="$(< "$i")"
+		n="$(cat "$(dirname "$i")/name")"
+		m=("${HWMON[@]}")
+		if [ ${#m[@]} -eq 0 ]; then
+			m=("$n")
+		fi
+		for mi in "${m[@]}"; do
+			if [ "$mi" = "$n" ]; then
+				echo "$(u_calcf "$v")" "$n"
+				break
+			fi
+		done
+	done)"
+	if [ "$1" = "temp" ]; then
+		ret="$(awk '$1>0' <<< "$ret")"
+	fi
+	echo "$ret"
+}
+
+m_mem() {
+	# memory information (ram used, ram percentage, swap used, swap percentage)
+	ret="$(free -k | awk 'NR>1 {q=0; if ($2>0) q=($2-$4)/$2; print $2-$4, 100*q}')"
+	echo "$ret"
+}
+
+m_net() {
+	# network devices (device, status, address, down, up)
+	f="$(ls /sys/class/net | sort)"
+	ret="$(for n in $f; do
+		m=("${NETDEVS[@]}")
+		if [ ${#m[@]} -eq 0 ]; then
+			m=("$n")
+		fi
+		for mi in "${m[@]}"; do
+			if [ "$mi" = "$n" ]; then
+				s="$(< /sys/class/net/$n/operstate)"
+				a="$(ip -o -4 addr show $n scope global | awk '{print $4;}' | cut -d/ -f 1)"
+				if [ -z "$a" ]; then a="0.0.0.0"; fi
+				r="$(u_calci "$(< /sys/class/net/$n/statistics/rx_bytes)"/1024)"
+				t="$(u_calci "$(< /sys/class/net/$n/statistics/tx_bytes)"/1024)"
+				echo "$n $s $a $r $t"
+				break
+			fi
+		done
+	done)"
+	echo "$ret"
+}
+
+m_bat() {
+	# battery information (name, level, status, time)
+	# TODO: remaining time is computed as current energy divided by current power, this does not work when charging!
+	f="$(ls /sys/class/power_supply | sort)"
+	ret="$(for n in $f; do
+		m=("${BATS[@]}")
+		if [ ${#m[@]} -eq 0 ]; then
+			m=("$n")
+		fi
+		for mi in "${m[@]}"; do
+			if [ "$mi" = "$n" ]; then
+				u="$(< /sys/class/power_supply/$n/uevent)"
+				l="$(awk -F = '$1 == "POWER_SUPPLY_CAPACITY" {printf $2}' <<< "$u")"
+				case "$(awk -F = '$1 == "POWER_SUPPLY_STATUS" {printf $2}' <<< "$u")" in
+					Charging) s="▲" ;;
+					Discharging) s="▼" ;;
+					*) s='~' ;;
+				esac
+				t="$(awk -F = '$1 == "POWER_SUPPLY_ENERGY_NOW" {e=$2} $1 == "POWER_SUPPLY_POWER_NOW" {p=$2} END {if (p>0) print int( 3600*e/p )}' <<< "$u")"
+				echo "$n $l $s $t"
+				break
+			fi
+		done
+	done)"
+	echo "$ret"
+}
+
